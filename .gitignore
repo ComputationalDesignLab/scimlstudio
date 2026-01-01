@@ -1,2 +1,5 @@
+.vscode/
 scimlstudio.egg-info/
+scimlstudio/__pycache__/
+scimlstudio/utils/__pycache__/
 docs/build
