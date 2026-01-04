@@ -33,7 +33,6 @@ class Standardize:
             self.mean = torch.mean(x, dim=0)
         else:
             assert mean.ndim == 1, "mean must be a 1D tensor"
-            assert mean.shape[0] == x.shape[1], "mean must have the same number of features as input data"
             self.mean = mean
 
         if std is None:
@@ -41,12 +40,11 @@ class Standardize:
             self.std = torch.clamp(torch.std(x, dim=0), 1e-8)
         else:
             assert std.ndim == 1, "std must be a 1D tensor"
-            assert std.shape[0] == x.shape[1], "std must have the same number of features as input data"
             assert torch.all(std > 0.0), "std must be clamped to a very small value to avoid a divide by zero error"
             self.std = std
 
         assert x.device == self.mean.device == self.std.device, "Input data, mean and std must be on the same device"
-        assert self.mean.shape == self.std.shape, "mean and std must have the same shape"
+        assert self.mean.shape[0] == self.std.shape[0] == x.shape[1], "mean and std must have the same shape and it should be same as number of features in input data"
 
     def transform(self, x: torch.Tensor) -> torch.Tensor:
 
