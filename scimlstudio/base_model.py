@@ -17,3 +17,11 @@ class BaseModel(nn.Module):
     @abstractmethod
     def evaluate(self):
         pass
+
+    @abstractmethod
+    def transform_input(self):
+        pass
+
+    @abstractmethod
+    def transform_output(self):
+        pass
