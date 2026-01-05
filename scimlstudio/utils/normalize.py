@@ -2,7 +2,7 @@ import torch
 
 class Normalize:
 
-    def __init__(self, x: torch.Tensor, min: torch.Tensor = None, max: torch.Tensor = None):
+    def __init__(self, x: torch.Tensor, lower_bound: torch.Tensor = None, upper_bound: torch.Tensor = None):
         """
             Class for Min-max normalization of data
 
@@ -11,43 +11,43 @@ class Normalize:
             x : torch.Tensor
                 data to be normalized
 
-            min: torch.Tensor
+            lower_bound: torch.Tensor
                 1D tensor array which defines lower bound for normalization. If none, then
-                min is set to 0 for each feature
+                lower_bound is set to 0 for each feature
 
-            max: torch.Tensor
+            upper_bound: torch.Tensor
                 1D tensor array which defines upper bound for normalization. If none, then
-                max is set to 1 for each feature
+                upper_bound is set to 1 for each feature
         """
 
         # Some checks
         assert isinstance(x, torch.Tensor), "Input data must be a torch Tensor"
         assert x.ndim == 2, "Input data must be a 2D tensor"
-        assert isinstance(min, type(None)) or isinstance(min, torch.Tensor), "min must be a torch Tensor or None"
-        assert isinstance(max, type(None)) or isinstance(max, torch.Tensor), "max must be a torch Tensor or None"
+        assert isinstance(lower_bound, type(None)) or isinstance(lower_bound, torch.Tensor), "lower_bound must be a torch Tensor or None"
+        assert isinstance(upper_bound, type(None)) or isinstance(upper_bound, torch.Tensor), "upper_bound must be a torch Tensor or None"
 
         self.min_feature_vector = torch.min(x, axis=0)[0] # min value of each feature
         self.max_feature_vector = torch.max(x, axis=0)[0] # max value of each feature
 
-        if min is None:
-            self.min = torch.zeros(x.shape[1]).to(x)
+        if lower_bound is None:
+            self.lower_bound = torch.zeros(x.shape[1]).to(x)
         else:
-            assert min.ndim == 1, "min must be a 1D tensor"
-            assert min.shape[0] == x.shape[1], "min must have the same number of features as the input data"
-            self.min = min
+            assert lower_bound.ndim == 1, "lower_bound must be a 1D tensor"
+            assert lower_bound.shape[0] == x.shape[1], "lower_bound must have the same number of features as the input data"
+            self.lower_bound = lower_bound.to(x)
 
-        if max is None:
-            self.max = torch.ones(x.shape[1]).to(x)
+        if upper_bound is None:
+            self.upper_bound = torch.ones(x.shape[1]).to(x)
         else:
-            assert max.ndim == 1, "max must be a 1D tensor"
-            assert max.shape[0] == x.shape[1], "max must have the same number of features as the input data"
-            self.max = max
+            assert upper_bound.ndim == 1, "upper_bound must be a 1D tensor"
+            assert upper_bound.shape[0] == x.shape[1], "upper_bound must have the same number of features as the input data"
+            self.upper_bound = upper_bound.to(x)
 
-        assert torch.all(self.max > self.min), "All elements of max must be greater than min"
+        assert torch.all(self.upper_bound > self.lower_bound), "All elements of upper_bound must be greater than lower_bound"
 
     def transform(self, x: torch.Tensor) -> torch.Tensor:
         """
-            Transform the data to the given range [min, max]
+            Transform the data to the given range [lower_bound, upper_bound]
 
             Parameters
             ----------
@@ -57,7 +57,7 @@ class Normalize:
             Returns
             -------
             x : torch.Tensor
-                data scaled to the given range [min, max]
+                data scaled to the given range [lower_bound, upper_bound]
         """
 
         assert isinstance(x, torch.Tensor), "Input data must be a torch Tensor"
@@ -66,7 +66,7 @@ class Normalize:
 
         x = (x - self.min_feature_vector) / (self.max_feature_vector - self.min_feature_vector) # scaling to [0, 1]
 
-        x = x * (self.max - self.min) + self.min # scaling to [min, max]
+        x = x * (self.upper_bound - self.lower_bound) + self.lower_bound # scaling to [lower bound, upper bound]
 
         return x
 
@@ -89,7 +89,7 @@ class Normalize:
         assert x.ndim == 2, "Input data must be a 2D tensor"
         assert x.shape[1] == self.min_feature_vector.shape[0], "Input data must have the same number of features as the data used for fitting"
 
-        x = (x - self.min) / (self.max - self.min) # scaling to [0, 1]
+        x = (x - self.lower_bound) / (self.upper_bound - self.lower_bound) # scaling to [0, 1]
 
         x = x * (self.max_feature_vector - self.min_feature_vector) + self.min_feature_vector # scaling to original range
 
