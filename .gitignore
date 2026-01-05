@@ -3,3 +3,4 @@ scimlstudio.egg-info/
 scimlstudio/__pycache__/
 scimlstudio/utils/__pycache__/
 docs/build
+tests/__pycache__
