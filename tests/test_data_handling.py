@@ -43,19 +43,21 @@ class TestDataHandling(unittest.TestCase):
         mean = torch.mean(Y, dim=0)
         std = torch.clamp(torch.std(Y, dim=0), 1e-8)
 
-        # Initializing the standardize class
+        # Initializing the standardize class 
         ytransform = Standardize(Y, mean=mean, std=std)
 
         # Transforming the data
         Y_standardized = ytransform.transform(Y)
         Y_reconstruction = ytransform.inverse_transform(Y_standardized)
 
-        # Checks for standardization
+        # Checks for reconstructed data
         torch.testing.assert_close(Y_reconstruction, Y, rtol=0, atol=1e-6, check_device=True, check_dtype=True)
+        torch.testing.assert_close(torch.mean(Y_reconstruction, dim=0), mean, rtol=0, atol=1e-6, check_device=False, check_dtype=False)
+        torch.testing.assert_close(torch.std(Y_reconstruction, dim=0), std, rtol=0, atol=1e-6, check_device=False, check_dtype=False)
+
+        # Checks on standardized data
         torch.testing.assert_close(torch.mean(Y_standardized, dim=0), torch.zeros(n_col), rtol=0, atol=1e-6, check_device=False, check_dtype=False)
         torch.testing.assert_close(torch.std(Y_standardized, dim=0), torch.ones(n_col), rtol=0, atol=1e-6, check_device=False, check_dtype=False)
-
-        # Few assertions
         assert Y.device == Y_standardized.device
         assert Y.dtype == Y_standardized.dtype
         
