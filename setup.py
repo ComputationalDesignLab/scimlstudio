@@ -6,6 +6,6 @@ setup(
     packages=find_packages(include=["scimlstudio*"]),
     python_requires=">=3.12",
     install_requires=[
-        "botorch",
+        "torch>=2.9.0",
     ]
 )
