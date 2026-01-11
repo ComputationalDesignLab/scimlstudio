@@ -1,13 +1,9 @@
-from abc import abstractmethod
-from torch import nn
+from abc import ABC, abstractmethod
 
-class BaseModel(nn.Module):
-
-    def __init__(self):
-        super().__init__()
+class BaseModel(ABC):
 
     @abstractmethod
-    def train(self):
+    def fit(self):
         pass
 
     @abstractmethod
@@ -16,12 +12,4 @@ class BaseModel(nn.Module):
 
     @abstractmethod
     def evaluate(self):
-        pass
-
-    @abstractmethod
-    def transform_input(self):
-        pass
-
-    @abstractmethod
-    def transform_output(self):
         pass
