@@ -1,1 +1,1 @@
-from .normalize import Normalize
+from .transformations import Normalize, Standardize
