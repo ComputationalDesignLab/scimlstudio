@@ -1,6 +1,5 @@
 import unittest, torch
-from scimlstudio.utils.normalize import Normalize
-from scimlstudio.utils.standardize import Standardize
+from scimlstudio.utils.transformations import Normalize, Standardize
 
 torch.manual_seed(0)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
