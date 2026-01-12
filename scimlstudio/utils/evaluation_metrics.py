@@ -50,6 +50,6 @@ def evaluate_scalar(true_values: torch.Tensor, predict_values: torch.Tensor, met
 
         prod_var = torch.var(true_values) * torch.var(predict_values)
 
-        r2 = (covariance/prod_var)**2
+        r2 = covariance**2 / prod_var
 
         return r2.item()
