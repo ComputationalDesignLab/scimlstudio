@@ -9,7 +9,3 @@ class BaseModel(ABC):
     @abstractmethod
     def predict(self):
         pass
-
-    @abstractmethod
-    def evaluate(self):
-        pass
