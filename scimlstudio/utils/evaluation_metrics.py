@@ -45,8 +45,11 @@ def evaluate_scalar(true_values: torch.Tensor, predict_values: torch.Tensor, met
         
     if metric == "r2":
 
-        numerator = torch.cov(true_values, predict_values)
-        denominator = torch.var(true_values) * torch.var(predict_values)
-        r2 = (numerator/denominator)**2
+        covariance = ( (true_values - torch.mean(true_values)) * 
+                      (predict_values - torch.mean(predict_values)) ).sum() / (true_values.shape[0] - 1)
+
+        prod_var = torch.var(true_values) * torch.var(predict_values)
+
+        r2 = (covariance/prod_var)**2
 
         return r2.item()
