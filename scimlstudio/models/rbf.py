@@ -38,12 +38,22 @@ class RBF(BaseModel):
                 String that specifies which parametric basis function should be used
                 User has a choice between "gaussian", "multiquadric" and "inverse"
 
-                gaussian --> exp(- r^2/(2 * sigma^2))
+                gaussian --> exp(-r^2/(2 * sigma^2))
                 multiquadric --> (r^2 + sigma^2)^0.5
                 inverse --> (r^2 + sigma^2)^(-0.5)        
         """
 
         super().__init__()
+
+        # Checking inputs
+        assert isinstance(xtrain, torch.Tensor) and xtrain.ndim == 2, "xtrain must be a 2D tensor array"
+        assert isinstance(ytrain, torch.Tensor) and ytrain.ndim == 2, "ytrain must be a 2D tensor array"
+        assert xtrain.shape[0] == ytrain.shape[0], "number of samples in input and output training data must be the same"
+        assert xtrain.device == ytrain.device, "input and output training data must be on the same device"
+        assert isinstance(sigma, float), "sigma value must be a floating point value"
+        assert isinstance(basis, str), "basis choice must be a string"
+        assert basis in ["gaussian", "multiquadric", "inverse"], "basis choice is not a valid choice. choice must be one of [gaussian, multiquadric, inverse]"
+
         self.sigma = sigma
         self.basis = basis
         self.input_transform = input_transform
@@ -98,6 +108,11 @@ class RBF(BaseModel):
             ypred: torch.Tensor
                 Predictions of the model on the specified points
         """
+        # Checks for training and inputs
+        assert hasattr(self, "rbf_weights"), "model has not been trained. call fit method before predict"
+        assert isinstance(x, torch.Tensor) and x.ndim == 2, "input data provided to the model must be a 2D tensor array"
+        assert x.device == self.xtrain.device, "provided input data must be on the same device as the training data"
+
         x = self.transform_values(x, self.input_transform)
 
         # Basis matrix definition
@@ -162,6 +177,7 @@ class RBF(BaseModel):
         if transform is None:
             transformed_data = data
         else:
+            assert isinstance(transform, Normalize) or isinstance(transform, Standardize), "transform must be an instance of Normalize or Standardize class"
             transformed_data = transform.transform(data)
 
         return transformed_data
