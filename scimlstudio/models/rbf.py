@@ -90,7 +90,8 @@ class RBF(BaseModel):
 
                 # Putting value in basis matrix 
                 basis_matrix[i, j] = self.basis_function(r)
-                
+        
+        basis_matrix = basis_matrix + 1e-6*torch.eye(ns,ns).to(self.xtrain)
         basis_matrix_inverse = torch.linalg.pinv(basis_matrix)
         self.rbf_weights = torch.matmul(basis_matrix_inverse, self.ytrain)
 
