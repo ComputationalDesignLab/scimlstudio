@@ -4,7 +4,7 @@ from ..utils.transformations import Standardize, Normalize
 
 class RBF(BaseModel):
 
-    def __init__(self, xtrain: torch.Tensor, ytrain: torch.Tensor, sigma: float,
+    def __init__(self, x_train: torch.Tensor, y_train: torch.Tensor, sigma: float,
                  input_transform: Normalize | Standardize | None = None, output_transform: Normalize | Standardize | None = None, 
                  basis: str = "gaussian"):
 
@@ -46,11 +46,11 @@ class RBF(BaseModel):
         super().__init__()
 
         # Checking inputs
-        assert isinstance(xtrain, torch.Tensor) and xtrain.ndim == 2, "xtrain must be a 2D tensor array"
-        assert isinstance(ytrain, torch.Tensor) and ytrain.ndim == 2, "ytrain must be a 2D tensor array"
-        assert xtrain.shape[0] == ytrain.shape[0], "number of samples in input and output training data must be the same"
-        assert xtrain.device == ytrain.device, "input and output training data must be on the same device"
-        assert isinstance(sigma, float), "sigma value must be a floating point value"
+        assert isinstance(x_train, torch.Tensor) and x_train.ndim == 2, "xtrain must be a 2D tensor array"
+        assert isinstance(y_train, torch.Tensor) and y_train.ndim == 2, "ytrain must be a 2D tensor array"
+        assert x_train.shape[0] == y_train.shape[0], "number of samples in input and output training data must be the same"
+        assert x_train.device == y_train.device, "input and output training data must be on the same device"
+        assert isinstance(sigma, float) and sigma > 0, "sigma value must be a positive floating point value"
         assert isinstance(basis, str), "basis choice must be a string"
         assert basis in ["gaussian", "multiquadric", "inverse"], "basis choice is not a valid choice. choice must be one of [gaussian, multiquadric, inverse]"
 
@@ -61,8 +61,8 @@ class RBF(BaseModel):
         self.basis_function = self.set_basis_function(self.basis)
         
         # Set training data for the model
-        self.xtrain = self.transform_values(xtrain, input_transform)
-        self.ytrain = self.transform_values(ytrain, output_transform)
+        self.xtrain = self.transform_values(x_train, input_transform)
+        self.ytrain = self.transform_values(y_train, output_transform)
 
     def fit(self) -> torch.Tensor:
 
@@ -73,6 +73,9 @@ class RBF(BaseModel):
             -------
             rbf_weights: torch.Tensor
                 Tensor array with the fitted weights of the model
+
+            basis_matrix: torch.Tensor
+                Tensor array containing the basis matrix for the model
         """
         
         # Basis matrix definition
@@ -91,7 +94,7 @@ class RBF(BaseModel):
         basis_matrix_inverse = torch.linalg.pinv(basis_matrix)
         self.rbf_weights = torch.matmul(basis_matrix_inverse, self.ytrain)
 
-        return self.rbf_weights.clone()
+        return self.rbf_weights.clone(), basis_matrix
     
     def predict(self, x: torch.Tensor) -> torch.Tensor:
 
@@ -116,16 +119,17 @@ class RBF(BaseModel):
         x = self.transform_values(x, self.input_transform)
 
         # Basis matrix definition
-        basis_matrix = torch.zeros((self.xtrain.shape[0], x.shape[0])).to(self.xtrain)
+        basis_matrix = torch.zeros((x.shape[0], self.xtrain.shape[0])).to(self.xtrain)
 
         # Assigning values to the basis matrix
-        for i in range(self.xtrain.shape[0]):
-            for j in range(x.shape[0]):
+        for i in range(x.shape[0]):
+            for j in range(self.xtrain.shape[0]):
                 r = torch.linalg.norm(x[i] - self.xtrain[j], ord=2)
                 basis_matrix[i, j] = self.basis_function(r)
 
         ypred = torch.matmul(basis_matrix, self.rbf_weights)
-        ypred = self.transform_values(ypred, self.output_transform)
+        if self.output_transform is not None:
+            ypred = self.output_transform.inverse_transform(ypred)
 
         return ypred
         
