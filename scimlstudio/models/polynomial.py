@@ -1,5 +1,5 @@
 import torch
-from ..base_model import BaseModel
+from ..base_models.base_model import BaseModel
 from ..utils.transformations import Normalize, Standardize
 
 class Polynomial(BaseModel):
