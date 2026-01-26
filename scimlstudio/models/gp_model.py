@@ -42,13 +42,73 @@ class SingleOutputGP(ExactGP, GPBaseModel):
                 self.output_transform = output_transform
 
         def transform_inputs(self):
-                pass
+
+                """
+                        Method to transform the inputs based on the provided transform
+
+                        Returns
+                        -------
+                        x_transformed: torch.Tensor
+                                Transformed input data based on provided transform
+                """
+
+                if self.input_transform is not None:
+                        self.input_transform = self.input_transform(self.x_train)
+                        x_transformed = self.input_transform.transform(self.x_train)
+                        return x_transformed
+                
+                else:
+                        return self.x_train
 
         def transform_outputs(self):
-                pass
+                
+                """
+                        Method to transform the outputs based on the provided transform
 
-        def fit(self):
-                pass
+                        Returns
+                        -------
+                        y_transformed: torch.Tensor
+                                Transformed output data based on provided transform
+                """
+
+                if self.output_transform is not None:
+                        self.output_transform = self.output_transform(self.y_train)
+                        y_transformed = self.output_transform.transform(self.y_train)
+                        return y_transformed
+                
+                else:
+                        return self.y_train
+
+        def fit(self, training_iterations: int, mll, learning_rate: float):
+                """
+                        Method to fit the GP model to the given data
+
+                        Parameters
+                        ----------
+                        training_iterations: int
+                                Number of iterations for the fitting process
+                        mll:
+                                Marginal log likelihood used to fit the GP model 
+                                "Loss" function for the GP models
+                        learning_rate:
+                                The value of the learning rate for the optimization
+                """
+
+                # Putting the model in train mode
+                self.train()
+                self.likelihood.train()
+
+                # Setting the optimizer
+                optim = torch.optim.Adam(self.parameters(), lr=learning_rate)
+
+                # Running the optimization loop to fit the model
+                for i in range(training_iterations):
+
+                        optim.zero_grad()
+                        model_output = self(self.x_train)
+                        loss_function = -mll(model_output, self.y_train)
+                        loss_function.backward()
+                        optim.step()
 
         def predict(self):
                 pass
