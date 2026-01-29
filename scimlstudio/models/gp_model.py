@@ -133,7 +133,7 @@ class SingleOutputGP(ExactGP, GPBaseModel):
                         loss_function.backward() # Backward pass to calculate gradients
                         optim.step() # Making an optimizer step
                         if verbose:
-                                print(f"Iteration {iter}/{training_iterations}: Marginal log likelihood {loss_function}")
+                                print(f"Iteration {iter}/{training_iterations}: Marginal log likelihood {loss_function.item()}")
 
         def forward(self, x: torch.Tensor) -> MultivariateNormal:
                 
