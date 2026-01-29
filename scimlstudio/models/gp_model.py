@@ -1,11 +1,16 @@
 import torch
+import gpytorch
 from ..base_models.gp_base_model import GPBaseModel
 from ..utils.transformations import Standardize, Normalize
-from gyptorch.models import ExactGP
+from botorch.posteriors.gpytorch import GPyTorchPosterior
+from botorch.models.utils.gpytorch_modules import get_covar_module_with_dim_scaled_prior, get_gaussian_likelihood_with_lognormal_prior
+from gpytorch.means import ConstantMean
+from gpytorch.models import ExactGP
+from gpytorch.distributions import MultivariateNormal
 
 class SingleOutputGP(ExactGP, GPBaseModel):
 
-        def __init__(self, x_train: torch.Tensor, y_train: torch.Tensor, likelihood, mean_module, covar_module,
+        def __init__(self, x_train: torch.Tensor, y_train: torch.Tensor, likelihood, mean_module = None, covar_module = None,
                      input_transform: Normalize | Standardize | None = None, output_transform: Normalize | Standardize | None = None):
 
                 """
@@ -30,18 +35,32 @@ class SingleOutputGP(ExactGP, GPBaseModel):
                 
                 """
 
+                # Assigning the likelihood
+                if likelihood is None:
+                        self.likelihood = get_gaussian_likelihood_with_lognormal_prior()
+                else:
+                        self.likelihood = likelihood
+
+                # Initiliazing the parent class
                 super(SingleOutputGP, self).__init__(x_train, y_train, likelihood)
 
-                # Assigning the likelihood, mean function and covariance function
-                self.likelihood = likelihood
-                self.mean_module = mean_module
-                self.covar_module = covar_module
+                # Assigning the mean function
+                if mean_module is None:
+                        self.mean_module = ConstantMean()
+                else:
+                        self.mean_module = mean_module
+                
+                # Assigning the covariance function
+                if covar_module is None:
+                        self.covar_module = get_covar_module_with_dim_scaled_prior(ard_num_dims=x_train.shape[-1])
+                else:
+                        self.covar_module = covar_module
 
                 # Assigning the data transforms
                 self.input_transform = input_transform
                 self.output_transform = output_transform
 
-        def transform_inputs(self):
+        def transform_inputs(self) -> torch.Tensor:
 
                 """
                         Method to transform the inputs based on the provided transform
@@ -60,7 +79,7 @@ class SingleOutputGP(ExactGP, GPBaseModel):
                 else:
                         return self.x_train
 
-        def transform_outputs(self):
+        def transform_outputs(self) -> torch.Tensor:
                 
                 """
                         Method to transform the outputs based on the provided transform
@@ -79,7 +98,9 @@ class SingleOutputGP(ExactGP, GPBaseModel):
                 else:
                         return self.y_train
 
-        def fit(self, training_iterations: int, mll, learning_rate: float):
+        def fit(self, training_iterations: int, mll: gpytorch.mlls.ExactMarginalLogLikelihood, optimizer: torch.optim.Optimizer, 
+                verbose: bool = False):
+                
                 """
                         Method to fit the GP model to the given data
 
@@ -87,11 +108,13 @@ class SingleOutputGP(ExactGP, GPBaseModel):
                         ----------
                         training_iterations: int
                                 Number of iterations for the fitting process
-                        mll:
+                        mll: gpytorch.mlls.ExactMarginalLogLikelihood
                                 Marginal log likelihood used to fit the GP model 
                                 "Loss" function for the GP models
-                        learning_rate:
-                                The value of the learning rate for the optimization
+                        optimizer: torch.optim.Optimizer
+                                Optimizer for finding optimal hyperparameters
+                        verbose: bool
+                                Boolean flag of whether to print the progress of training
                 """
 
                 # Putting the model in train mode
@@ -99,19 +122,102 @@ class SingleOutputGP(ExactGP, GPBaseModel):
                 self.likelihood.train()
 
                 # Setting the optimizer
-                optim = torch.optim.Adam(self.parameters(), lr=learning_rate)
+                optim = optimizer
 
                 # Running the optimization loop to fit the model
-                for i in range(training_iterations):
+                for iter in range(training_iterations):
 
-                        optim.zero_grad()
-                        model_output = self(self.x_train)
-                        loss_function = -mll(model_output, self.y_train)
-                        loss_function.backward()
-                        optim.step()
+                        optim.zero_grad() # Zeroing gradients
+                        model_output = self(self.x_train) # Output of the GP model
+                        loss_function = -mll(model_output, self.y_train) # Calculating MLL as the loss
+                        loss_function.backward() # Backward pass to calculate gradients
+                        optim.step() # Making an optimizer step
+                        if verbose:
+                                print(f"Iteration {iter}/{training_iterations}: Marginal log likelihood {loss_function}")
 
-        def predict(self):
-                pass
+        def forward(self, x: torch.Tensor) -> MultivariateNormal:
+                
+                """
+                        Forward method for the model
+                        
+                        Parameters
+                        ----------
+                        x: torch.Tensor
+                                Inputs to the model where predictions are desired
 
-        def posterior(self):
-                pass
+                        Returns
+                        -------
+                        dist: MultivariateNormal
+                                MultivariateNormal prediction from the GP model
+                """
+
+                mean = self.mean_module(x) # Evaluate the mean function
+                covariance = self.covar_module(x) # Evaluate the covariance function
+                dist = MultivariateNormal(mean, covariance) # Calculate the multivariate normal distribution
+
+                return dist
+
+        def predict(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+                
+                """
+                        Method for calculating predictions on given input data
+
+                        Parameters
+                        ----------
+                        x: torch.Tensor
+                                Input data for calculating the predictions
+
+                        Returns
+                        -------
+                        mean_values: torch.Tensor
+                                Mean predictions from the GP model
+                        std_values: torch.Tensor
+                                Standard deviations from the GP model
+                """
+                # Putting the model into eval mode
+                self.eval()
+                self.likelihood.eval()
+                if self.input_transform is not None:
+                        x = self.input_transform.transform(x)
+
+                # Do not track gradients and use gpytorch setting to calculate faster prediction
+                with torch.no_grad(), gpytorch.settings.fast_pred_var():
+                        predictions = self.likelihood(self(x))
+
+                # Mean values of the prediction
+                mean_values = predictions.mean()
+
+                # Confidence region - provides 2 times standard deviations 
+                lower_values, _ = predictions.confidence_region()
+                std_values = 0.5 * (mean_values - lower_values)
+
+                if self.output_transform is not None:
+                        mean_values, std_values = self.output_transform.inverse_transform(mean_values), self.output_transform.inverse_transform(std_values)
+
+                return mean_values, std_values
+
+
+        def posterior(self, x: torch.Tensor) -> GPyTorchPosterior:
+                
+                """
+                        Method for calculating the posterior distribution of the GP model
+
+                        Parameters
+                        ----------
+                        x: torch.Tensor
+                                Input data where posterior distribution must be calculated
+
+                        Returns
+                        -------
+                        posterior: GPyTorchPosterior
+                                Posterior distribution object for a gpytorch model
+                """
+
+                # Putting the model into eval mode
+                self.eval()
+                self.likelihood.eval()
+
+                # Determining the posterior
+                dist = self.likelihood(self(x))
+                posterior = GPyTorchPosterior(mvn=dist)
+                return posterior
