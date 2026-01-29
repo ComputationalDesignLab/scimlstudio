@@ -10,7 +10,7 @@ from gpytorch.distributions import MultivariateNormal
 
 class SingleOutputGP(ExactGP, GPBaseModel):
 
-        def __init__(self, x_train: torch.Tensor, y_train: torch.Tensor, likelihood, mean_module = None, covar_module = None,
+        def __init__(self, x_train: torch.Tensor, y_train: torch.Tensor, likelihood_input = None, mean_module = None, covar_module = None,
                      input_transform: Normalize | Standardize | None = None, output_transform: Normalize | Standardize | None = None):
 
                 """
@@ -36,13 +36,14 @@ class SingleOutputGP(ExactGP, GPBaseModel):
                 """
 
                 # Assigning the likelihood
-                if likelihood is None:
-                        self.likelihood = get_gaussian_likelihood_with_lognormal_prior()
+                if likelihood_input is None:
+                        likelihood = get_gaussian_likelihood_with_lognormal_prior()
                 else:
-                        self.likelihood = likelihood
+                        likelihood = likelihood_input
 
                 # Initiliazing the parent class
                 super(SingleOutputGP, self).__init__(x_train, y_train, likelihood)
+                self.likelihood = likelihood
 
                 # Assigning the mean function
                 if mean_module is None:
@@ -59,6 +60,9 @@ class SingleOutputGP(ExactGP, GPBaseModel):
                 # Assigning the data transforms
                 self.input_transform = input_transform
                 self.output_transform = output_transform
+
+                self.x_train = self.transform_inputs()
+                self.y_train = self.transform_outputs()
 
         def transform_inputs(self) -> torch.Tensor:
 
@@ -185,7 +189,7 @@ class SingleOutputGP(ExactGP, GPBaseModel):
                         predictions = self.likelihood(self(x))
 
                 # Mean values of the prediction
-                mean_values = predictions.mean()
+                mean_values = predictions.mean
 
                 # Confidence region - provides 2 times standard deviations 
                 lower_values, _ = predictions.confidence_region()
