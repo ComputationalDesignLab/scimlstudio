@@ -1,3 +1,3 @@
 from .polynomial import Polynomial
 from .rbf import RBF
-from .gp_model import SingleOutputGP
+from .single_output_gp_model import SingleOutputGP
