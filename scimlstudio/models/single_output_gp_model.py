@@ -9,7 +9,7 @@ from gpytorch.means import ConstantMean, Mean
 from gpytorch.models import ExactGP
 from gpytorch.distributions import MultivariateNormal
 from gpytorch.kernels import ScaleKernel, Kernel, RBFKernel
-from gpytorch.likelihoods import Likelihood, FixedNoiseGaussianLikelihood
+from gpytorch.likelihoods import Likelihood
 from gpytorch.constraints.constraints import GreaterThan
 from gpytorch.priors.torch_priors import LogNormalPrior
 
@@ -38,11 +38,6 @@ def get_dim_scaled_covar_module(base_covar_module: Kernel, ard_num_dims: int, ba
                                lengthscale_constraint=GreaterThan(2.5e-2, transform=None, initial_value=lengthscale_prior.mode))
     scaled_kernel = ScaleKernel(kernel)
     return scaled_kernel
-
-def get_lognormal_prior_fixed_noise_likelihood(noises: torch.Tensor, batch_shape: torch.Size | None = None) -> Likelihood:
-        prior = LogNormalPrior(loc=-4.0, scale=1.0)
-        likelihood = FixedNoiseGaussianLikelihood(noise=noises, noise_prior=prior, batch_shape=batch_shape)
-        return likelihood
 
 class SingleOutputGP(ExactGP, GPBaseModel):
 
@@ -87,15 +82,15 @@ class SingleOutputGP(ExactGP, GPBaseModel):
                 assert isinstance(use_dim_scaling, bool), "use_dim_scaling must be a Boolean value"
 
                 # Assigning the likelihood
-                likelihood = get_lognormal_prior_fixed_noise_likelihood(noises=1e-6*torch.ones(x_train.shape[0])) if likelihood_module is None else likelihood_module
+                likelihood = get_gaussian_likelihood_with_lognormal_prior() if likelihood_module is None else likelihood_module
 
                 # Initiliazing the parent class
                 xtrain = self.transform_inputs(x_train, input_transform)
                 ytrain = self.transform_outputs(y_train, output_transform)
                 super(SingleOutputGP, self).__init__(xtrain, ytrain.reshape(-1,), likelihood)
-                # if noiseless:
-                #         self.likelihood.noise_covar.register_constraint("raw_noise", gpytorch.constraints.GreaterThan(1e-15))
-                #         self.likelihood.noise = 1e-15 # Need to tell likelihood that noise is zero
+                if noiseless:
+                        self.likelihood.noise_covar.register_constraint("raw_noise", gpytorch.constraints.GreaterThan(1e-12))
+                        self.likelihood.noise = 1e-12 # Need to tell likelihood that noise is zero
 
                 self.y_train = ytrain
                 self.x_train = xtrain
@@ -111,7 +106,7 @@ class SingleOutputGP(ExactGP, GPBaseModel):
                         self.covar_module = ScaleKernel(covar_module(ard_num_dims=xtrain.shape[-1]))
 
                 # Setting the model to GPU if the data provided is also on GPU
-                if xtrain.device != "cpu":
+                if xtrain.device.type != 'cpu':
                         self.cuda()
                         self.likelihood.cuda()
 
