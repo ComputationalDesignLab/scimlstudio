@@ -88,6 +88,7 @@ class SingleOutputGP(ExactGP, GPBaseModel):
                 xtrain = self.transform_inputs(x_train, input_transform)
                 ytrain = self.transform_outputs(y_train, output_transform)
                 super(SingleOutputGP, self).__init__(xtrain, ytrain.reshape(-1,), likelihood)
+                # TO DO: see if the noiseless GP can be implemented in a better way
                 if noiseless:
                         self.likelihood.noise_covar.register_constraint("raw_noise", gpytorch.constraints.GreaterThan(1e-12))
                         self.likelihood.noise = 1e-12 # Need to tell likelihood that noise is zero
