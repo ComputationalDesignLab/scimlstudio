@@ -88,6 +88,7 @@ class SingleOutputGP(ExactGP, GPBaseModel):
                 xtrain = self.transform_inputs(x_train, input_transform)
                 ytrain = self.transform_outputs(y_train, output_transform)
                 super(SingleOutputGP, self).__init__(xtrain, ytrain.reshape(-1,), likelihood)
+                # TO DO: see if the noiseless GP can be implemented in a better way
                 if noiseless:
                         self.likelihood.noise_covar.register_constraint("raw_noise", gpytorch.constraints.GreaterThan(1e-12))
                         self.likelihood.noise = 1e-12 # Need to tell likelihood that noise is zero
@@ -104,6 +105,11 @@ class SingleOutputGP(ExactGP, GPBaseModel):
                         self.covar_module = get_dim_scaled_covar_module(base_covar_module=covar_module, ard_num_dims=xtrain.shape[-1])
                 else:
                         self.covar_module = ScaleKernel(covar_module(ard_num_dims=xtrain.shape[-1]))
+
+                # Setting the model to GPU if the data provided is also on GPU
+                if xtrain.device.type != 'cpu':
+                        self.cuda()
+                        self.likelihood.cuda()
 
         def transform_inputs(self, x: torch.Tensor, input_transform: Normalize | Standardize | None) -> torch.Tensor:
 
