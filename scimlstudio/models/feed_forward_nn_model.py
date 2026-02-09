@@ -136,8 +136,6 @@ class FeedForwardNeuralNetwork(BaseModel):
 
                 loss = loss_func(y_pred, y_batch) # compute the loss
 
-                print(loss)
-
                 loss.backward() # backward pass
 
                 optimizer.step() # update the parameters
