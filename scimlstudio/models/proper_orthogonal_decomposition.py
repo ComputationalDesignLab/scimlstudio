@@ -133,11 +133,39 @@ class POD(BaseDimensionalityReduction):
         assert isinstance(coord, torch.Tensor) and coord.ndim==2, "corodinates must be 2D Tensor array"
         assert coord.device == self.s_train.device, "the given data must be on the same device as the training snapshots"
         # Calculating the reconstruction
-        reconstruction = torch.matmul(self.U, coord.mT)
+        y = torch.matmul(self.U, coord.mT)
         # Transforming the reconstruction
         if self.snapshot_transform is not None:
-            reconstruction = self.snapshot_transform.inverse_transform(reconstruction)
-        return reconstruction
+            y = self.snapshot_transform.inverse_transform(y)
+        return y
+    
+    def predict(self, x: torch.Tensor):
+        """
+            Class method for prediction using the POD method
+
+            Parameters
+            ----------
+            x: torch.Tensor
+                2D Tensor array containing the high-dimensional data
+
+            Returns
+            -------
+            reconstruction: torch.Tensor
+                2D Tensor array containing the reconstructions of the data
+        """
+        assert isinstance(x, torch.Tensor) and x.ndim==2, "x must be 2D Tensor array"
+        assert x.device == self.s_train.device, "the given data must be on the same device as the training snapshots"
+
+        with torch.no_grad():
+            if self.snapshot_transform is not None:
+                x = self.snapshot_transform.transform(x)
+            coord = torch.matmul(self.U, x)
+            reconstruction = torch.matmul(self.U, coord.mT)
+            if self.snapshot_transform is not None:
+                reconstruction = self.snapshot_transform.inverse_transform(reconstruction)
+            return reconstruction
+
+        
 
 
 
