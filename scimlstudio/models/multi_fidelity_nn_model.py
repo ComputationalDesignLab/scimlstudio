@@ -201,8 +201,6 @@ class MultifidelityNeuralNetwork(BaseModel):
 
             optimizer.step() # update the parameters
 
-            print(loss_lf.item(), loss_hf.item())
-
         if convert_to_eval_mode:
             for network in networks:
                 network.eval() # set network in train mode
