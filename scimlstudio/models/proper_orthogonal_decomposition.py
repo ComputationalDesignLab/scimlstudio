@@ -4,7 +4,7 @@ from ..utils import Standardize, Normalize
 
 class POD(BaseDimensionalityReduction):
 
-    def __init__(
+    def __init__( 
             self,
             s_train: torch.Tensor,
             ric: float,
