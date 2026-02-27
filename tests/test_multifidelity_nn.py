@@ -98,9 +98,40 @@ class TestMultiFidelityNeuralNetwork(unittest.TestCase):
         r2 = evaluate_scalar(y_test_hf.reshape(-1,), ytest_pred.reshape(-1,), "r2")
         nrmse = evaluate_scalar(y_test_hf.reshape(-1,), ytest_pred.reshape(-1,), "nrmse")
 
-        print(r2, nrmse)
-
         assert nrmse < 2.5e-2 and r2 > 0.99
+
+    def test_input_output_shapes(self):
+
+        # initialize mf model
+        mf_model = MultifidelityNeuralNetwork(
+            x_train_lf=x_lf,
+            y_train_lf=y_lf,
+            x_train_hf=x_hf,
+            y_train_hf=y_hf,
+            network_lf=network_lf,
+            network_linear_corr=network_linear_corr,
+            network_nonlinear_corr=network_nonlinear_corr,
+            input_transform=input_transform,
+            output_transform_lf=output_transform_lf,
+            output_transform_hf=output_transform_hf
+        )
+
+        optimizer = torch.optim.Adam(mf_model.parameters, lr=1e-3)
+
+        mf_model.fit(
+            optimizer=optimizer,
+            epochs=5000,
+            reg_const_lf=1e-4,
+            reg_const_nonlinear=1e-3
+        )
+
+        # predict - 1 samples
+        ypred = mf_model.predict(x_hf[0])
+        assert ypred.ndim == 1 and ypred.shape[0] == 1
+
+        # predict - 5 samples
+        ypred = mf_model.predict(x_lf[:5])
+        assert ypred.ndim == 2 and ypred.shape[0] == 5
 
 if __name__ == '__main__':
     unittest.main()
