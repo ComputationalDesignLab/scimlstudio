@@ -28,7 +28,7 @@ class POD(BaseDimensionalityReduction):
         """
 
         # Setting the snapshots
-        assert isinstance(s_train, torch.Tensor) and s_train.dim == 2, "Snapshots must be provided as a 2D tensor array"
+        assert isinstance(s_train, torch.Tensor) and s_train.ndim == 2, "Snapshots must be provided as a 2D tensor array"
         self.s_train = s_train
 
         # Setting the ric value
@@ -64,7 +64,7 @@ class POD(BaseDimensionalityReduction):
             # Calculating the ric
             calculated_ric = torch.sum(torch.square(sigma[:k])) / torch.sum(sigma_squared)
             # Comparing the ric
-            if calculated_ric < self.ric:
+            if calculated_ric > self.ric:
                 break
             else:
                 continue
@@ -88,7 +88,7 @@ class POD(BaseDimensionalityReduction):
         # Calculating the truncation modes based on RIC
         self.k = self.calculate_truncation(self.S)
         # Truncating the modes
-        self.modes = self.U[:self.k]
+        self.modes = self.U[:,:self.k]
 
     def encoding(self, x: torch.Tensor):
         """
@@ -112,7 +112,7 @@ class POD(BaseDimensionalityReduction):
         if self.snapshot_transform is not None:
             x = self.snapshot_transform.transform(x)
         # Calculating the coordinates
-        coord = torch.matmul(self.U, x)
+        coord = torch.matmul(self.modes.T, x)
         return coord
     
     def decoding(self, coord: torch.Tensor):
@@ -133,7 +133,7 @@ class POD(BaseDimensionalityReduction):
         assert isinstance(coord, torch.Tensor) and coord.ndim==2, "corodinates must be 2D Tensor array"
         assert coord.device == self.s_train.device, "the given data must be on the same device as the training snapshots"
         # Calculating the reconstruction
-        y = torch.matmul(self.U, coord.mT)
+        y = torch.matmul(self.modes, coord)
         # Transforming the reconstruction
         if self.snapshot_transform is not None:
             y = self.snapshot_transform.inverse_transform(y)
@@ -159,8 +159,8 @@ class POD(BaseDimensionalityReduction):
         with torch.no_grad():
             if self.snapshot_transform is not None:
                 x = self.snapshot_transform.transform(x)
-            coord = torch.matmul(self.U, x)
-            reconstruction = torch.matmul(self.U, coord.mT)
+            coord = torch.matmul(self.modes.T, x)
+            reconstruction = torch.matmul(self.modes, coord)
             if self.snapshot_transform is not None:
                 reconstruction = self.snapshot_transform.inverse_transform(reconstruction)
             return reconstruction
