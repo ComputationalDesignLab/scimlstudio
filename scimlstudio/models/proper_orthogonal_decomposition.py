@@ -83,6 +83,7 @@ class POD(BaseDimensionalityReduction):
             full_svd: bool
                 Boolean value that specifies whether to perform full or reduced SVD
         """
+        assert isinstance(full_svd,bool), "the value for full_svd provided must be a boolean"
         # Performing singular value decomposition
         snapshots = self.snapshot_transform.transform(self.s_train.mT).mT if self.snapshot_transform is not None else self.s_train
         self.U, self.S, self.Vt = torch.linalg.svd(snapshots, full_matrices = full_svd)

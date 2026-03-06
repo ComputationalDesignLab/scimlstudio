@@ -24,10 +24,12 @@ class TestPOD(unittest.TestCase):
         assert z.shape[-1] < xtrain.shape[-1], "the projection step must lead to a lower dimension than the original data"
 
         # check ric
-        assert torch.all(torch.tensor(pod.ric_list, **args)) <= 1.0, "ric values must be always less than 1.0"
+        assert torch.all(torch.tensor(pod.ric_list, **args)) <= 1.0, "ric values must be always less than or equal to 1.0"
+        assert torch.all(torch.tensor(pod.ric_list, **args)) >= 0.0, "ric values must be always greater than or equal to 0.0"
 
         # check POD modes
         assert pod.modes.shape[0] == xtrain.shape[-1], "pod modes must have the same number of outputs as the original data" 
+        assert pod.modes.shape[-1] == pod.k, "number of modes retaind must be equal to the value calculated using ric"
 
         # test prediction shape
         predict = pod.predict(xtrain.mT)
