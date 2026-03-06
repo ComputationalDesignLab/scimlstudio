@@ -59,17 +59,19 @@ class POD(BaseDimensionalityReduction):
 
         # Squared singular values
         sigma_squared = torch.square(sigma)
-
+        ric_list = []
+        k_best = self.s_train.shape[-1]
         for k in range(len(sigma)):
             # Calculating the ric
             calculated_ric = torch.sum(torch.square(sigma[:k])) / torch.sum(sigma_squared)
+            ric_list.append(calculated_ric)
             # Comparing the ric
+            # TO DO: perhaps the below code can be implemented in a better manner
             if calculated_ric > self.ric:
-                break
-            else:
-                continue
+                if k < k_best:
+                    k_best = k
 
-        return k
+        return k_best, ric_list
 
     def fit(self, full_svd: bool = True):
         """
@@ -82,11 +84,11 @@ class POD(BaseDimensionalityReduction):
                 Boolean value that specifies whether to perform full or reduced SVD
         """
         # Performing singular value decomposition
-        snapshots = self.snapshot_transform.transform(self.s_train) if self.snapshot_transform is not None else self.s_train
+        snapshots = self.snapshot_transform.transform(self.s_train.mT).mT if self.snapshot_transform is not None else self.s_train
         self.U, self.S, self.Vt = torch.linalg.svd(snapshots, full_matrices = full_svd)
 
         # Calculating the truncation modes based on RIC
-        self.k = self.calculate_truncation(self.S)
+        self.k, self.ric_list = self.calculate_truncation(self.S)
         # Truncating the modes
         self.modes = self.U[:,:self.k]
 
@@ -108,12 +110,14 @@ class POD(BaseDimensionalityReduction):
         """
         assert isinstance(x, torch.Tensor) and x.ndim==2, "x must be 2D Tensor array"
         assert x.device == self.s_train.device, "the given data must be on the same device as the training snapshots"
+        assert hasattr(self, "modes"), "modes have not been created. call fit method before encoding"
+
         # Transforming the input
         if self.snapshot_transform is not None:
-            x = self.snapshot_transform.transform(x)
+            x = self.snapshot_transform.transform(x.mT).mT
         # Calculating the coordinates
-        coord = torch.matmul(self.modes.T, x)
-        return coord
+        coord = torch.matmul(self.modes.mT, x)
+        return coord.mT
     
     def decoding(self, coord: torch.Tensor):
         """
@@ -132,12 +136,14 @@ class POD(BaseDimensionalityReduction):
         """
         assert isinstance(coord, torch.Tensor) and coord.ndim==2, "corodinates must be 2D Tensor array"
         assert coord.device == self.s_train.device, "the given data must be on the same device as the training snapshots"
+        assert hasattr(self, "modes"), "modes have not been created. call fit method before decoding"
+
         # Calculating the reconstruction
-        y = torch.matmul(self.modes, coord)
+        y = torch.matmul(self.modes, coord.mT)
         # Transforming the reconstruction
         if self.snapshot_transform is not None:
-            y = self.snapshot_transform.inverse_transform(y)
-        return y
+            y = self.snapshot_transform.inverse_transform(y.mT).mT
+        return y.mT
     
     def predict(self, x: torch.Tensor):
         """
@@ -155,14 +161,15 @@ class POD(BaseDimensionalityReduction):
         """
         assert isinstance(x, torch.Tensor) and x.ndim==2, "x must be 2D Tensor array"
         assert x.device == self.s_train.device, "the given data must be on the same device as the training snapshots"
+        assert hasattr(self, "modes"), "modes have not been created. call fit method before predict"
 
         with torch.no_grad():
             if self.snapshot_transform is not None:
-                x = self.snapshot_transform.transform(x)
-            coord = torch.matmul(self.modes.T, x)
+                x = self.snapshot_transform.transform(x.mT).mT
+            coord = torch.matmul(self.modes.mT, x)
             reconstruction = torch.matmul(self.modes, coord)
             if self.snapshot_transform is not None:
-                reconstruction = self.snapshot_transform.inverse_transform(reconstruction)
+                reconstruction = self.snapshot_transform.inverse_transform(reconstruction.mT).mT
             return reconstruction
 
         
