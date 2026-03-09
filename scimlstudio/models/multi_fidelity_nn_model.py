@@ -244,15 +244,13 @@ class MultifidelityNeuralNetwork(BaseModel):
         if self.input_transform is not None:
             x = self.input_transform.transform(x)
 
-        with torch.no_grad():
+        y_lf = self.network_lf(x)
 
-            y_lf = self.network_lf(x)
+        x_hf = torch.hstack((x, y_lf)) # combined input for correlation networks
 
-            x_hf = torch.hstack((x, y_lf)) # combined input for correlation networks
+        y_linear_corr = self.network_linear_corr(x_hf)
 
-            y_linear_corr = self.network_linear_corr(x_hf)
-
-            y_nonlinear_corr = self.network_nonlinear_corr(x_hf)
+        y_nonlinear_corr = self.network_nonlinear_corr(x_hf)
             
         y_pred = y_linear_corr + y_nonlinear_corr
 
