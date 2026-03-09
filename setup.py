@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="scimlstudio",
-    version="1.5.1",
+    version="1.6.2",
     packages=find_packages(include=["scimlstudio*"]),
     python_requires=">=3.12",
     install_requires=[
