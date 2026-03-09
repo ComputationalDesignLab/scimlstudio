@@ -182,9 +182,8 @@ class FeedForwardNeuralNetwork(BaseModel):
         if self.input_transform is not None:
             x = self.input_transform.transform(x)
 
-        # predict in no grad context
-        with torch.no_grad():
-            y_pred = self.network(x)
+        # predict
+        y_pred = self.network(x)
 
         # inverse transform the predicted output
         if self.output_transform is not None:
