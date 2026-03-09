@@ -143,7 +143,7 @@ class FeedForwardNeuralNetwork(BaseModel):
         if convert_to_eval_mode:
             self.network.eval()
 
-    def predict(self, x: torch.Tensor) -> torch.Tensor:
+    def predict(self, x: torch.Tensor, with_grad: bool = False) -> torch.Tensor:
         """
             Method to predict the output for the given input data
 
@@ -154,6 +154,12 @@ class FeedForwardNeuralNetwork(BaseModel):
             x: torch.Tensor
                 a torch tensor representing the input data used for prediction
 
+            with_grad: bool
+                flag to determine whether to use no grad context during prediction.
+                The default value is False, i.e., predictions will be made without
+                tracking any gradients. Set this flag to `True` if you want to track
+                gradients
+
             Returns
             -------
             y_pred: torch.Tensor
@@ -162,6 +168,7 @@ class FeedForwardNeuralNetwork(BaseModel):
 
         assert isinstance(x, torch.Tensor), "`x` should be a torch tensor"
         assert x.device == self.x_train.device, "input data should be on the same device as the training data"
+        assert isinstance(with_grad, bool), "`with_grad` should be a boolean value"
 
         x_ndim = x.ndim # number of dimensions in the given input data
 
@@ -183,7 +190,11 @@ class FeedForwardNeuralNetwork(BaseModel):
             x = self.input_transform.transform(x)
 
         # predict
-        y_pred = self.network(x)
+        if with_grad:
+            y_pred = self.network(x)
+        else:
+            with torch.no_grad():
+                y_pred = self.network(x)
 
         # inverse transform the predicted output
         if self.output_transform is not None:

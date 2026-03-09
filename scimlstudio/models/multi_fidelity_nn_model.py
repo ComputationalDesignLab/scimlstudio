@@ -205,16 +205,20 @@ class MultifidelityNeuralNetwork(BaseModel):
             for network in networks:
                 network.eval() # set network in train mode
 
-    def predict(self, x):
+    def predict(self, x: torch.Tensor, with_grad: bool = False) -> torch.Tensor:
         """
             Method to predict the output for the given input data
-
-            `NOTE`: predictions are made in no grad context
 
             Parameters
             ----------
             x: torch.Tensor
                 a torch tensor representing the input data used for prediction
+
+            with_grad: bool
+                flag to determine whether to use no grad context during prediction.
+                The default value is False, i.e., predictions will be made without
+                tracking any gradients. Set this flag to `True` if you want to track
+                gradients
 
             Returns
             -------
@@ -224,6 +228,7 @@ class MultifidelityNeuralNetwork(BaseModel):
 
         assert isinstance(x, torch.Tensor), "`x` should be a torch tensor"
         assert x.device == self.x_train_hf.device, "input data should be on the same device as the training data"
+        assert isinstance(with_grad, bool), "`with_grad` should be a boolean value"
 
         x_ndim = x.ndim # number of dimensions in the given input data
 
@@ -244,15 +249,28 @@ class MultifidelityNeuralNetwork(BaseModel):
         if self.input_transform is not None:
             x = self.input_transform.transform(x)
 
-        y_lf = self.network_lf(x)
+        # predict
+        if with_grad:
+            y_lf = self.network_lf(x)
 
-        x_hf = torch.hstack((x, y_lf)) # combined input for correlation networks
+            x_hf = torch.hstack((x, y_lf)) # combined input for correlation networks
 
-        y_linear_corr = self.network_linear_corr(x_hf)
+            y_linear_corr = self.network_linear_corr(x_hf)
 
-        y_nonlinear_corr = self.network_nonlinear_corr(x_hf)
-            
-        y_pred = y_linear_corr + y_nonlinear_corr
+            y_nonlinear_corr = self.network_nonlinear_corr(x_hf)
+                
+            y_pred = y_linear_corr + y_nonlinear_corr
+        else:
+            with torch.no_grad():
+                y_lf = self.network_lf(x)
+
+                x_hf = torch.hstack((x, y_lf)) # combined input for correlation networks
+
+                y_linear_corr = self.network_linear_corr(x_hf)
+
+                y_nonlinear_corr = self.network_nonlinear_corr(x_hf)
+                    
+                y_pred = y_linear_corr + y_nonlinear_corr
 
         if self.output_transform_hf is not None:
             y_pred = self.output_transform_hf.inverse_transform(y_pred)
