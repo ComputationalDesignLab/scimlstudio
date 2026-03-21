@@ -29,8 +29,8 @@ class FeedForwardAutoencoder(BaseDimensionalityReduction):
         super().__init__()
 
         # Setting the input data
-        assert isinstance(x_train, torch.Tensor) and x_train.dim == 2, "high dimensional input data must be provided as a 2D tensor array"
-        self.s_train = x_train
+        assert isinstance(x_train, torch.Tensor) and x_train.ndim == 2, "high dimensional input data must be provided as a 2D tensor array"
+        self.x_train = x_train
 
         # Setting the snapshot transform
         if data_transform is not None:
@@ -61,6 +61,10 @@ class FeedForwardAutoencoder(BaseDimensionalityReduction):
 
         self.decoder = decoder
         self.encoder = encoder
+
+    @property
+    def parameters(self):
+        return list(self.encoder.parameters()) + list(self.decoder.parameters()) # returning the parameters of the entire network
 
     def fit(
             self,
@@ -132,7 +136,7 @@ class FeedForwardAutoencoder(BaseDimensionalityReduction):
             self.encoder.eval()
             self.decoder.eval()
 
-    def encoding(self, x: torch.Tensor):
+    def encoding(self, x: torch.Tensor) -> torch.Tensor:
         """
             Class method to encode data into the latent space using the encoder network
 
@@ -155,7 +159,7 @@ class FeedForwardAutoencoder(BaseDimensionalityReduction):
         latent = self.encoder(x)
         return latent
     
-    def decoding(self, latent: torch.Tensor):
+    def decoding(self, latent: torch.Tensor) -> torch.Tensor:
         """
             Class method to decode latent space to recover the original 
             high-dimensional data
@@ -179,7 +183,7 @@ class FeedForwardAutoencoder(BaseDimensionalityReduction):
             y = self.data_transform.inverse_transform(y)
         return y
     
-    def predict(self, x: torch.Tensor):
+    def predict(self, x: torch.Tensor, with_grad: bool = False) -> torch.Tensor:
         """
             Class method for prediction using the autoencoder model
 
@@ -187,20 +191,44 @@ class FeedForwardAutoencoder(BaseDimensionalityReduction):
             ----------
             x: torch.Tensor
                 2D Tensor array containing the high-dimensional data
+            with_grad: bool
+                Flag to indicate whether to compute gradients during prediction, default = False
 
             Returns
             -------
             reconstruction: torch.Tensor
                 2D Tensor array containing the reconstructions of the data
         """
-        assert isinstance(x, torch.Tensor) and x.ndim==2, "x must be 2D Tensor array"
         assert x.device == self.x_train.device, "the given data must be on the same device as the training snapshots"
+        assert isinstance(with_grad, bool), "with_grad variable must be a boolean value"
 
-        with torch.no_grad():
-            if self.data_transform is not None:
-                x = self.data_transform.transform(x)
+        # adjusting for the batch dimension
+        x_ndim = x.ndim # number of dimensions in the given input data
+        if x_ndim == self.x_train.ndim:
+            assert x.shape[1:] == self.x_train.shape[1:], "input data should have the same feature size as the training data"
+        elif x_ndim == self.x_train.ndim - 1:
+            assert x.shape == self.x_train.shape[1:], "input data should have the same feature size as the training data"
+            x = x.unsqueeze(0) # add the batch dimension as 1
+        else:
+            raise ValueError("input data should be of similar shape as the training data")
+        
+        # network training mode check
+        if self.encoder.training or self.decoder.training:
+            raise RuntimeError("Network is in train mode, please use the `fit` method to train the network first and then call the `predict` method")
+
+        if self.data_transform is not None:
+            x = self.data_transform.transform(x)
+        if with_grad:
             encoding = self.encoder(x)
             reconstruction = self.decoder(encoding)
-            if self.data_transform is not None:
-                reconstruction = self.data_transform.inverse_transform(reconstruction)
-            return reconstruction
+        else:
+            with torch.no_grad():
+                encoding = self.encoder(x)
+                reconstruction = self.decoder(encoding)  
+        if self.data_transform is not None:
+            reconstruction = self.data_transform.inverse_transform(reconstruction)
+
+        # removing batch dimension if the input data did not have a batch dimension
+        if x_ndim == self.x_train.ndim - 1:
+            reconstruction = reconstruction.squeeze(0)
+        return reconstruction
